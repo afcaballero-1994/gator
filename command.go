@@ -2,10 +2,15 @@ package main
 
 import(
 	"fmt"
+	"context"
+	"github.com/google/uuid"
+	"time"
 	"github.com/afcaballero-1994/gator/internal/config"
+	"github.com/afcaballero-1994/gator/internal/database"
 )
 
 type state struct {
+	db *database.Queries
 	cfg *config.Config
 }
 
@@ -22,9 +27,49 @@ func handlerLogin(s *state, cmd command) error {
 	if len(cmd.ars) != 1 {
 		return fmt.Errorf("Usage: %s <name>", cmd.name)
 	}
-	s.cfg.SetUser(cmd.ars[0])
+	name := cmd.ars[0]
+	
+	ctx := context.Background()
+	
+	r, err := s.db.GetUser(ctx, name)
+	if err != nil {
+		return err;
+	}
+	
+	s.cfg.SetUser(r.Name)
 
-	fmt.Printf("Change: %s has been set as user\n", cmd.ars[0])
+	fmt.Printf("Change: %s has been set as user\n", r.Name)
+
+	return nil
+}
+
+func handlerRegister(s *state, cmd command) error {
+	ctx := context.Background()
+	uname := cmd.ars[0]
+
+	ruser, err := s.db.CreateUser(ctx, database.CreateUserParams{
+		ID: uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name: uname,
+	})
+
+	if err != nil{
+		return err
+	}
+
+	s.cfg.SetUser(uname)
+	fmt.Println("User with name:", ruser.Name, "was created")
+	return nil
+}
+
+func handlerReset(s *state, cmd command) error {
+	ctx := context.Background()
+
+	err := s.db.ResetTable(ctx)
+	if err != nil{
+		return err
+	}
 
 	return nil
 }
