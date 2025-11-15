@@ -14,3 +14,6 @@ where name = $1 limit 1;
 
 -- name: ResetTable :exec
 truncate users;
+
+-- name: GetUsers :many
+select * from users;

@@ -74,6 +74,24 @@ func handlerReset(s *state, cmd command) error {
 	return nil
 }
 
+func handlerUsers(s *state, cmd command) error {
+	ctx := context.Background()
+
+	rusers, err := s.db.GetUsers(ctx)
+
+	if err != nil {
+		return err
+	}
+	for _,u := range rusers {
+		pu := "* " + u.Name
+		if u.Name == s.cfg.Current_username {
+			pu += " (current)"
+		}
+		fmt.Println(pu)
+	}
+	return nil
+}
+
 func (c *commands) run(s *state, cmd command) error {
 	handle, exist := c.cmds[cmd.name]
 	if !exist {
