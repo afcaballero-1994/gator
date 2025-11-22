@@ -3,6 +3,7 @@ package main
 import(
 	"fmt"
 	"context"
+	"html"
 	"github.com/google/uuid"
 	"time"
 	"github.com/afcaballero-1994/gator/internal/config"
@@ -89,6 +90,25 @@ func handlerUsers(s *state, cmd command) error {
 		}
 		fmt.Println(pu)
 	}
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	ctx := context.Background()
+
+	feed, err := fetchFeed(ctx, "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return err
+	}
+	
+	fmt.Println("Channel Title:", html.UnescapeString(feed.Channel.Title))
+	fmt.Println("Channel Description:", html.UnescapeString(feed.Channel.Description))
+
+	for _, post := range feed.Channel.Item {
+		fmt.Println("*", html.UnescapeString(post.Title))
+		fmt.Println("-", html.UnescapeString(post.Description))
+	}
+
 	return nil
 }
 

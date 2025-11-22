@@ -36,6 +36,7 @@ func main() {
 	cms.register("register", handlerRegister)
 	cms.register("reset", handlerReset)
 	cms.register("users", handlerUsers)
+	cms.register("agg", handlerAgg)
 
 	c := command{
 		name: os.Args[1],
