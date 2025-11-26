@@ -13,7 +13,7 @@ select * from users
 where name = $1 limit 1;
 
 -- name: ResetTable :exec
-truncate users;
+truncate users cascade;
 
 -- name: GetUsers :many
 select * from users;

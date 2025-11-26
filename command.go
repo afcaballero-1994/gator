@@ -1,6 +1,7 @@
 package main
 
 import(
+	"os"
 	"fmt"
 	"context"
 	"html"
@@ -112,6 +113,35 @@ func handlerAgg(s *state, cmd command) error {
 	return nil
 }
 
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.ars) != 2{
+		os.Exit(1)
+	}
+	ctx := context.Background()
+	u, err := s.db.GetUser(ctx, s.cfg.Current_username)
+	if err != nil {
+		return err;
+	}
+	rf, err := s.db.CreateFeed(ctx, database.CreateFeedParams {
+			ID: uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Name: cmd.ars[0],
+			Url: cmd.ars[1],
+			UserID: u.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Feed created successfully:")
+	printFeed(rf)
+	fmt.Println()
+	fmt.Println("=====================================")
+
+	return nil
+}
+
 func (c *commands) run(s *state, cmd command) error {
 	handle, exist := c.cmds[cmd.name]
 	if !exist {
@@ -122,4 +152,13 @@ func (c *commands) run(s *state, cmd command) error {
 
 func (c *commands) register(name string, f func(*state, command) error) {
 	c.cmds[name] = f
+}
+
+func printFeed(feed database.Feed) {
+	fmt.Printf("* ID:            %s\n", feed.ID)
+	fmt.Printf("* Created:       %v\n", feed.CreatedAt)
+	fmt.Printf("* Updated:       %v\n", feed.UpdatedAt)
+	fmt.Printf("* Name:          %s\n", feed.Name)
+	fmt.Printf("* URL:           %s\n", feed.Url)
+	fmt.Printf("* UserID:        %s\n", feed.UserID)
 }

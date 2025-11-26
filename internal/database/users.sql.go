@@ -97,7 +97,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 }
 
 const resetTable = `-- name: ResetTable :exec
-truncate users
+truncate users cascade
 `
 
 func (q *Queries) ResetTable(ctx context.Context) error {
