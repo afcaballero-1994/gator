@@ -38,6 +38,7 @@ func main() {
 	cms.register("users", handlerUsers)
 	cms.register("agg", handlerAgg)
 	cms.register("addfeed", handlerAddFeed)
+	cms.register("feeds", handlerGetFeeds)
 
 	c := command{
 		name: os.Args[1],

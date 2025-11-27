@@ -142,6 +142,24 @@ func handlerAddFeed(s *state, cmd command) error {
 	return nil
 }
 
+func handlerGetFeeds(s* state, cmd command) error {
+	ctx := context.Background()
+
+	fds, err := s.db.GetFeeds(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, fd := range fds {
+		fmt.Println("Name:", fd.Name)
+		fmt.Println("Url:", fd.Url)
+		fmt.Println("Username:", fd.Username)
+		fmt.Println("------//---------------")
+	}
+
+	return nil
+}
+
 func (c *commands) run(s *state, cmd command) error {
 	handle, exist := c.cmds[cmd.name]
 	if !exist {
