@@ -12,3 +12,6 @@ returning *;
 
 -- name: GetFeeds :many
 select feeds.name, feeds.url, users.name as username from feeds join users on user_id = users.id;
+
+-- name: GetFeed :one
+select feeds.id from feeds where feeds.url = $1 limit 1;

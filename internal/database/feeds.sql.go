@@ -55,6 +55,17 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (Feed, e
 	return i, err
 }
 
+const getFeed = `-- name: GetFeed :one
+select feeds.id from feeds where feeds.url = $1 limit 1
+`
+
+func (q *Queries) GetFeed(ctx context.Context, url string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, getFeed, url)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getFeeds = `-- name: GetFeeds :many
 select feeds.name, feeds.url, users.name as username from feeds join users on user_id = users.id
 `
