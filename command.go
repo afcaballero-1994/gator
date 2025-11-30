@@ -1,24 +1,24 @@
 package main
 
-import(
-	"os"
-	"fmt"
+import (
 	"context"
-	"html"
-	"github.com/google/uuid"
-	"time"
+	"fmt"
 	"github.com/afcaballero-1994/gator/internal/config"
 	"github.com/afcaballero-1994/gator/internal/database"
+	"github.com/google/uuid"
+	"html"
+	"os"
+	"time"
 )
 
 type state struct {
-	db *database.Queries
+	db  *database.Queries
 	cfg *config.Config
 }
 
 type command struct {
 	name string
-	ars []string
+	ars  []string
 }
 
 type commands struct {
@@ -30,14 +30,14 @@ func handlerLogin(s *state, cmd command) error {
 		return fmt.Errorf("Usage: %s <name>", cmd.name)
 	}
 	name := cmd.ars[0]
-	
+
 	ctx := context.Background()
-	
+
 	r, err := s.db.GetUser(ctx, name)
 	if err != nil {
-		return err;
+		return err
 	}
-	
+
 	s.cfg.SetUser(r.Name)
 
 	fmt.Printf("Change: %s has been set as user\n", r.Name)
@@ -50,13 +50,13 @@ func handlerRegister(s *state, cmd command) error {
 	uname := cmd.ars[0]
 
 	ruser, err := s.db.CreateUser(ctx, database.CreateUserParams{
-		ID: uuid.New(),
+		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		Name: uname,
+		Name:      uname,
 	})
 
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
@@ -69,7 +69,7 @@ func handlerReset(s *state, cmd command) error {
 	ctx := context.Background()
 
 	err := s.db.ResetTable(ctx)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
@@ -84,7 +84,7 @@ func handlerUsers(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
-	for _,u := range rusers {
+	for _, u := range rusers {
 		pu := "* " + u.Name
 		if u.Name == s.cfg.Current_username {
 			pu += " (current)"
@@ -101,7 +101,7 @@ func handlerAgg(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
-	
+
 	fmt.Println("Channel Title:", html.UnescapeString(feed.Channel.Title))
 	fmt.Println("Channel Description:", html.UnescapeString(feed.Channel.Description))
 
@@ -113,32 +113,28 @@ func handlerAgg(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
-	if len(cmd.ars) != 2{
+func handlerAddFeed(user database.User, s *state, cmd command) error {
+	if len(cmd.ars) != 2 {
 		os.Exit(1)
 	}
 	ctx := context.Background()
-	u, err := s.db.GetUser(ctx, s.cfg.Current_username)
-	if err != nil {
-		return err;
-	}
-	rf, err := s.db.CreateFeed(ctx, database.CreateFeedParams {
-		ID: uuid.New(),
+	rf, err := s.db.CreateFeed(ctx, database.CreateFeedParams{
+		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		Name: cmd.ars[0],
-		Url: cmd.ars[1],
-		UserID: u.ID,
+		Name:      cmd.ars[0],
+		Url:       cmd.ars[1],
+		UserID:    user.ID,
 	})
 	if err != nil {
 		return err
 	}
-	ff, err := s.db.CreateFeedFollow(ctx, database.CreateFeedFollowParams {
-		ID: uuid.New(),
+	ff, err := s.db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		UserID: u.ID,
-		FeedID: rf.ID,
+		UserID:    user.ID,
+		FeedID:    rf.ID,
 	})
 	if err != nil {
 		return err
@@ -153,7 +149,7 @@ func handlerAddFeed(s *state, cmd command) error {
 	return nil
 }
 
-func handlerGetFeeds(s* state, cmd command) error {
+func handlerGetFeeds(s *state, cmd command) error {
 	ctx := context.Background()
 
 	fds, err := s.db.GetFeeds(ctx)
@@ -171,31 +167,28 @@ func handlerGetFeeds(s* state, cmd command) error {
 	return nil
 }
 
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(user database.User, s *state, cmd command) error {
 	if len(cmd.ars) != 1 {
 		fmt.Println("Need one argument")
 		os.Exit(1)
 	}
-	
+
 	ctx := context.Background()
-	u, err := s.db.GetUser(ctx, s.cfg.Current_username)
-	if err != nil {
-		return err;
-	}
+
 	f, err := s.db.GetFeed(ctx, cmd.ars[0])
 	if err != nil {
-		return err
+		return fmt.Errorf("Error getting feed: %s, err: %w", cmd.ars[0], err)
 	}
-	
-	ff, err := s.db.CreateFeedFollow(ctx, database.CreateFeedFollowParams {
-		ID: uuid.New(),
+
+	ff, err := s.db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		UserID: u.ID,
-		FeedID: f,
+		UserID:    user.ID,
+		FeedID:    f,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("Error adding follow: %w", err)
 	}
 
 	fmt.Println("User name:", ff.UserName)
@@ -203,16 +196,32 @@ func handlerFollow(s *state, cmd command) error {
 
 	return nil
 }
-func handlerFollowing(s *state, cmd command) error {
+func handlerFollowing(user database.User, s *state, cmd command) error {
 	ctx := context.Background()
-	
-	ffs, err := s.db.GetFeedFollowsForUser(ctx, s.cfg.Current_username)
+
+	ffs, err := s.db.GetFeedFollowsForUser(ctx, user.Name)
 	if err != nil {
 		return err
 	}
-	fmt.Println("User:", ffs[0].UserName)
-	for _, feed := range ffs {
-		fmt.Println("Feed name:", feed.FeedName)
+	if len(ffs) > 0 {
+		fmt.Println("User:", ffs[0].UserName)
+		for _, feed := range ffs {
+			fmt.Println("Feed name:", feed.FeedName)
+		}
+	}
+
+	return nil
+}
+
+func handlerUnfollow(user database.User, s *state, cmd command) error {
+	ctx := context.Background()
+
+	err := s.db.DeleteFollowForUser(ctx, database.DeleteFollowForUserParams{
+		Name: user.Name,
+		Url:  cmd.ars[0],
+	})
+	if err != nil {
+		return fmt.Errorf("Error unfollowing. Err: %w", err)
 	}
 
 	return nil

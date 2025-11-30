@@ -3,6 +3,7 @@ package main
 import _ "github.com/lib/pq"
 
 import (
+	"context"
 	"os"
 	"fmt"
 	"database/sql"
@@ -37,10 +38,11 @@ func main() {
 	cms.register("reset", handlerReset)
 	cms.register("users", handlerUsers)
 	cms.register("agg", handlerAgg)
-	cms.register("addfeed", handlerAddFeed)
+	cms.register("addfeed", userLogin(handlerAddFeed))
 	cms.register("feeds", handlerGetFeeds)
-	cms.register("follow", handlerFollow)
-	cms.register("following", handlerFollowing)
+	cms.register("follow", userLogin(handlerFollow))
+	cms.register("following", userLogin(handlerFollowing))
+	cms.register("unfollow", userLogin(handlerUnfollow))
 
 	c := command{
 		name: os.Args[1],
@@ -50,6 +52,18 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+	
+}
+
+func userLogin(handler func (user database.User, s *state, cmd command) error) func(*state, command) error {
+	ctx := context.Background()
+	return func(s* state, cmd command) error {
+		u, err := s.db.GetUser(ctx, s.cfg.Current_username)
+		if err != nil {
+			return fmt.Errorf("Error login to user: %w", err)
+		}
+		return handler(u, s, cmd)
 	}
 	
 }
