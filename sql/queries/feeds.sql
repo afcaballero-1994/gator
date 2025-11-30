@@ -15,3 +15,10 @@ select feeds.name, feeds.url, users.name as username from feeds join users on us
 
 -- name: GetFeed :one
 select feeds.id from feeds where feeds.url = $1 limit 1;
+
+-- name: MarkFeedAsFetched :exec
+update feeds set last_fetched_at = $1, updated_at = $1
+where id = $2;
+
+-- name: GetNextFeedToFetch :many
+select id, url from feeds order by last_fetched_at asc nulls first;

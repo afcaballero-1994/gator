@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"html"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/afcaballero-1994/gator/internal/config"
 	"github.com/afcaballero-1994/gator/internal/database"
 	"github.com/google/uuid"
-	"html"
-	"os"
-	"time"
 )
 
 type state struct {
@@ -95,26 +100,27 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	ctx := context.Background()
-
-	feed, err := fetchFeed(ctx, "https://www.wagslane.dev/index.xml")
+	if len(cmd.ars) != 1 {
+		fmt.Println("Usage: agg <time between reques>")
+		os.Exit(1)
+	}
+	tt, err := time.ParseDuration(cmd.ars[0])
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("Channel Title:", html.UnescapeString(feed.Channel.Title))
-	fmt.Println("Channel Description:", html.UnescapeString(feed.Channel.Description))
-
-	for _, post := range feed.Channel.Item {
-		fmt.Println("*", html.UnescapeString(post.Title))
-		fmt.Println("-", html.UnescapeString(post.Description))
+	fmt.Println("Collecting feeds every:", tt)
+	ticker := time.NewTicker(tt)
+	for ; ; <-ticker.C {
+		err = scrapeFeeds(s)
+		if err != nil {
+			return err
+		}
 	}
-
-	return nil
 }
 
 func handlerAddFeed(user database.User, s *state, cmd command) error {
 	if len(cmd.ars) != 2 {
+		fmt.Printf("usage: %s <name> <url>", cmd.name)
 		os.Exit(1)
 	}
 	ctx := context.Background()
@@ -213,6 +219,33 @@ func handlerFollowing(user database.User, s *state, cmd command) error {
 	return nil
 }
 
+func handlerBrowse(user database.User, s *state, cmd command) error {
+	lposts := 2
+	if len(cmd.ars) == 1 {
+		if slimit, err := strconv.Atoi(cmd.ars[0]); err == nil {
+			lposts = slimit
+		} else {
+			log.Printf("Error: Specified limit is invalid %s", cmd.ars[0])
+		}
+	}
+	psts, err := s.db.GetPosts(context.Background(), database.GetPostsParams{
+		UserID: user.ID,
+		Limit: int32(lposts),
+	})
+	if err != nil {
+		return fmt.Errorf("Error: Could not get posts due to, %w", err)
+	}
+	fmt.Printf("Found %d posts for user %s:\n", len(psts), user.Name)
+	for _, post := range psts {
+		fmt.Printf("%s from %s\n", post.PublishedAt.Time.Format("Mon Jan 2"), post.FeedName)
+		fmt.Printf("--- %s ---\n", post.Title)
+		fmt.Printf("    %v\n", post.Description.String)
+		fmt.Printf("Link: %s\n", post.Url)
+		fmt.Println("=====================================")
+	}
+	return nil
+}
+
 func handlerUnfollow(user database.User, s *state, cmd command) error {
 	ctx := context.Background()
 
@@ -246,4 +279,59 @@ func printFeed(feed database.Feed) {
 	fmt.Printf("* Name:          %s\n", feed.Name)
 	fmt.Printf("* URL:           %s\n", feed.Url)
 	fmt.Printf("* UserID:        %s\n", feed.UserID)
+}
+
+func scrapeFeeds(s *state) error {
+	ctx := context.Background()
+	fes, err := s.db.GetNextFeedToFetch(ctx)
+	if err != nil {
+		return fmt.Errorf("Error getting feeds, err: %w", err)
+	}
+	for _, fed := range fes {
+		err = s.db.MarkFeedAsFetched(ctx, database.MarkFeedAsFetchedParams{
+			LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			ID:            fed.ID,
+		})
+		if err != nil {
+			return fmt.Errorf("Error marking as fetched, err: %w", err)
+		}
+
+		feed, err := fetchFeed(ctx, fed.Url)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Channel Title:", html.UnescapeString(feed.Channel.Title))
+		fmt.Println("Channel Description:", html.UnescapeString(feed.Channel.Description))
+
+		for _, post := range feed.Channel.Item {
+			pubAt := sql.NullTime{}
+			if t, err := time.Parse(time.RFC1123Z, post.PubDate); err == nil{
+				pubAt = sql.NullTime{
+					Time: t,
+					Valid: true,
+				}
+			}			
+			_, err = s.db.CreatePosts(ctx, database.CreatePostsParams{
+				ID: uuid.New(),
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+				Title: html.UnescapeString(post.Title),
+				Url: html.UnescapeString(post.Link),
+				Description: sql.NullString{String: post.Description, Valid: true},
+				PublishedAt: pubAt,
+				FeedID: fed.ID,
+			})
+
+			if err != nil {
+				if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+					continue
+				}
+				log.Printf("Error: Could not create post, due to: %v", err)
+				continue
+			}
+		}
+
+	}
+	return nil
 }

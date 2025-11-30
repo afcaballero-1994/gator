@@ -1,14 +1,14 @@
 package main
 
-import _ "github.com/lib/pq"
-
 import (
 	"context"
-	"os"
-	"fmt"
 	"database/sql"
+	"fmt"
+	"os"
+
 	"github.com/afcaballero-1994/gator/internal/config"
 	"github.com/afcaballero-1994/gator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 	}
 	var s state
 	cfg, err := config.Read()
-	if err != nil{
+	if err != nil {
 		fmt.Println("Error:", err)
 	}
 	s.cfg = &cfg
@@ -31,7 +31,7 @@ func main() {
 	s.db = dbQueries
 
 	cms := commands{
-		cmds : make(map[string]func(*state, command) error),
+		cmds: make(map[string]func(*state, command) error),
 	}
 	cms.register("login", handlerLogin)
 	cms.register("register", handlerRegister)
@@ -43,27 +43,28 @@ func main() {
 	cms.register("follow", userLogin(handlerFollow))
 	cms.register("following", userLogin(handlerFollowing))
 	cms.register("unfollow", userLogin(handlerUnfollow))
+	cms.register("browse", userLogin(handlerBrowse))
 
 	c := command{
 		name: os.Args[1],
-		ars: os.Args[2:],
+		ars:  os.Args[2:],
 	}
 	err = cms.run(&s, c)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	
+
 }
 
-func userLogin(handler func (user database.User, s *state, cmd command) error) func(*state, command) error {
+func userLogin(handler func(user database.User, s *state, cmd command) error) func(*state, command) error {
 	ctx := context.Background()
-	return func(s* state, cmd command) error {
+	return func(s *state, cmd command) error {
 		u, err := s.db.GetUser(ctx, s.cfg.Current_username)
 		if err != nil {
 			return fmt.Errorf("Error login to user: %w", err)
 		}
 		return handler(u, s, cmd)
 	}
-	
+
 }
